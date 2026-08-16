@@ -7,7 +7,7 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ACT_LABELS = {
-  'GATE-OUT': 'Saída do depósito',
+  'GATE-OUT': 'SaÃ­da do depÃ³sito',
   'GATE-IN': 'Gate-in no terminal',
   'LOAD': 'Carregado no navio',
   'DISCHARG': 'Descarregado',
@@ -72,26 +72,38 @@ async function trackBL(bl) {
 
   let trackingData = null;
 
-  // Intercepta a resposta da API do Maersk antes de chegar no DOM
-  page.on('response', async response => {
-    const url = response.url();
-    if (url.includes('synergy/tracking/') && response.status() === 200) {
-      try {
-        const json = await response.json();
-        trackingData = parseTrackingData(json);
-      } catch (e) {}
-    }
-  });
-
   try {
-    await page.goto(`https://www.maersk.com/tracking/${bl}`, {
-      waitUntil: 'networkidle',
-      timeout: 45000,
+    // Carrega a home da Maersk para obter cookies e passar pelo Akamai
+    await page.goto('https://www.maersk.com/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
     });
-    // Aguarda mais um pouco para garantir que a requisição foi capturada
-    await page.waitForTimeout(3000);
+    // Aguarda Akamai JS rodar e gerar os tokens
+    await page.waitForTimeout(4000);
+
+    // Faz o fetch da API de dentro do Chrome (TLS fingerprint real + cookies Akamai)
+    const json = await page.evaluate(async (blNum) => {
+      try {
+        const r = await fetch(
+          `https://api.maersk.com/synergy/tracking/${blNum}?operator=MAEU`,
+          {
+            headers: {
+              'consumer-key': 'UtMm6JCDcGTnMGErNGvS2B98kt1Wl25H',
+              'api-version': 'v2',
+              'Accept': 'application/json',
+            },
+          }
+        );
+        if (!r.ok) return null;
+        return await r.json();
+      } catch (e) {
+        return null;
+      }
+    }, bl);
+
+    if (json) trackingData = parseTrackingData(json);
   } catch (e) {
-    console.log(`  Timeout/erro ao navegar para BL ${bl}: ${e.message}`);
+    console.log(`  Erro ao rastrear BL ${bl}: ${e.message}`);
   }
 
   await browser.close();
@@ -99,9 +111,9 @@ async function trackBL(bl) {
 }
 
 async function main() {
-  console.log(`[${new Date().toLocaleString('pt-BR')}] Iniciando rastreamento automático de BLs...`);
+  console.log(`[${new Date().toLocaleString('pt-BR')}] Iniciando rastreamento automÃ¡tico de BLs...`);
 
-  // Lê o estado atual do Supabase
+  // LÃª o estado atual do Supabase
   const { data: row, error } = await sb
     .from('app_state')
     .select('data')
@@ -137,12 +149,12 @@ async function main() {
     if (tracking) {
       proc.tracking = tracking;
       updated++;
-      console.log(`  ✓ ETA: ${tracking.eta || 'não disponível'} | Evento: ${tracking.lastEvent || '-'}`);
+      console.log(`  âœ“ ETA: ${tracking.eta || 'nÃ£o disponÃ­vel'} | Evento: ${tracking.lastEvent || '-'}`);
     } else {
-      console.log(`  ✗ Sem dados de rastreamento para ${proc.bl}`);
+      console.log(`  âœ— Sem dados de rastreamento para ${proc.bl}`);
     }
 
-    // Intervalo entre BLs para não sobrecarregar
+    // Intervalo entre BLs para nÃ£o sobrecarregar
     await new Promise(r => setTimeout(r, 4000));
   }
 
@@ -156,7 +168,7 @@ async function main() {
       console.error('Erro ao salvar no Supabase:', saveError);
       process.exit(1);
     }
-    console.log(`\n✅ ${updated} processo(s) atualizado(s) no Supabase.`);
+    console.log(`\nâœ… ${updated} processo(s) atualizado(s) no Supabase.`);
   } else {
     console.log('\nNenhum dado novo para salvar.');
   }
