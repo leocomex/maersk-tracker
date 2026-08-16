@@ -81,7 +81,12 @@ async function main() {
     const apiResponsePromise = new Promise(resolve => {
       const timer = setTimeout(() => resolve(null), 30000);
       page.on('response', async response => {
-        if (response.url().includes(`synergy/tracking/${bl}`) && response.status() === 200) {
+        const url = response.url();
+        // Loga todas as chamadas de API para debug
+        if (url.includes('maersk.com/') && (url.includes('track') || url.includes('shipping') || url.includes('container') || url.includes('api.'))) {
+          console.log(`    [API] ${response.status()} ${url.substring(0, 100)}`);
+        }
+        if (url.includes(`synergy/tracking/${bl}`) || url.includes(`track-and-trace`) || url.includes(`tracking/${bl}`)) {
           clearTimeout(timer);
           try { resolve(await response.json()); }
           catch { resolve(null); }
