@@ -1,0 +1,13 @@
+{
+  "name": "maersk-tracker",
+  "version": "1.0.0",
+  "description": "Rastreamento automático de BLs Maersk para o Semáforo COMEX",
+  "main": "track-bls.js",
+  "scripts": {
+    "track": "node track-bls.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "playwright": "^1.48.0"
+  }
+}
